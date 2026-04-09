@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# Java / Spring Boot
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+*.log
+
+# IDEs y SO
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secretos y credenciales (CRITICO)
+credentials.json
+*.pem
+*.key
+application-prod.properties
+application-prod.yml
