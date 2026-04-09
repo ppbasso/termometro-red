@@ -1,0 +1,25 @@
+{
+    "id": "PA433",
+    "name": "Parada 1 / Plaza Italia",
+    "services": [
+        {
+            "id": "210",
+            "valid": true,
+            "status_description": "Bus acercándose",
+            "buses": [
+                {
+                    "id": "BJFC-12",
+                    "meters_distance": 850,
+                    "min_arrival_time": 3,
+                    "max_arrival_time": 5
+                },
+                {
+                    "id": "ZWTY-88",
+                    "meters_distance": 2100,
+                    "min_arrival_time": 9,
+                    "max_arrival_time": 14
+                }
+            ]
+        }
+    ]
+}
