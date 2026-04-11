@@ -1,82 +1,54 @@
-import json
 import os
 import psycopg2
 import requests
 from dotenv import load_dotenv
 
-# Carga las variables secretas desde el archivo .env a la memoria
 load_dotenv()
 
-def inyectar_telemetria():
-    """
-    Consulta la API en vivo de RED y guarda los registros en la base de datos PostgreSQL.
-    """
-    url_api = "https://api.xor.cl/red/bus-stop/PA433"
+def inyectar_realidad_transapp(paradero_id):
+    # API de Transapp: El estándar de facto de la comunidad cuando el DTPM falla
+    url_api = f"https://api.transapp.cl/v1/prediction/stop/{paradero_id}"
     
-    # 1. Obtener los datos reales de la API
-    print(f"[*] Consultando API RED: {url_api}")
+    print(f"[*] Consultando Transapp (SLA Estable): {paradero_id}")
     try:
-        # Aumentamos el timeout a 30 evita que el script se caiga por latencia de la API pública
-        respuesta = requests.get(url_api, timeout=30)
+        # Transapp es rápido, 10s de timeout es más que suficiente
+        respuesta = requests.get(url_api, timeout=60)
         respuesta.raise_for_status()
         datos = respuesta.json()
-    except requests.exceptions.RequestException as e:
-        print(f"[!] Error de red al consultar la API: {e}")
-        return
-    
-    # Extraemos el ID del paradero
-    id_paradero = datos.get("id", "Desconocido")
-    
-    # 2. Conectar a la Base de Datos
-    url_db = os.getenv("DATABASE_URL")
-    if not url_db:
-        print("[!] Error: No se encontró la variable DATABASE_URL en el archivo .env")
+    except Exception as e:
+        print(f"[!] Error de conexión con Transapp: {e}")
         return
 
-    print("[*] Conectando a la bóveda en Neon.tech...")
-    
+    url_db = os.getenv("DATABASE_URL")
     try:
-        # Iniciamos la conexión con el motor de Postgres
         conexion = psycopg2.connect(url_db)
         cursor = conexion.cursor()
-        
-        registros_insertados = 0
-        
-        # 3. Extraer e Insertar cada bus
-        for servicio in datos.get("services", []):
-            recorrido = servicio.get("id")
-            
-            for bus in servicio.get("buses", []):
-                patente = bus.get("id")
-                distancia = bus.get("meters_distance")
-                minutos = bus.get("min_arrival_time")
-                
-                # Filtro de validación: Ignorar registros "fantasmas" que no traen telemetría útil
-                if patente and distancia is not None and minutos is not None:
-                    # Sentencia SQL parametrizada (%s) (La mejor práctica para evitar inyecciones SQL)
+        registros = 0
+
+        # Transapp devuelve una lista de predicciones directa
+        for prediccion in datos.get("predictions", []):
+            recorrido = prediccion.get("route_id")
+            for bus in prediccion.get("buses", []):
+                patente = bus.get("bus_id")
+                distancia = bus.get("distance_meters")
+                minutos = bus.get("arrival_minutes")
+
+                if patente and distancia is not None:
                     sql = """
                         INSERT INTO telemetria_buses (paradero, recorrido, patente, distancia_metros, tiempo_estimado_min)
                         VALUES (%s, %s, %s, %s, %s)
                     """
-                    valores = (id_paradero, recorrido, patente, distancia, minutos)
-                    
-                    # Ejecutamos la orden
-                    cursor.execute(sql, valores)
-                    registros_insertados += 1
+                    cursor.execute(sql, (paradero_id, recorrido, patente, distancia, minutos))
+                    registros += 1
         
-        # Confirmar y guardar los cambios (Commit)
         conexion.commit()
-        print(f"[*] ¡Éxito! Se inyectaron {registros_insertados} registros en la base de datos histórica.")
-        
+        print(f"[+] ¡ÉXITO! {registros} registros inyectados desde infraestructura de Transapp.")
     except Exception as e:
-        print(f"[!] Error crítico de base de datos: {e}")
+        print(f"[!] Error DB: {e}")
     finally:
-        # Siempre cerrar la conexión, pase lo que pase, para no agotar las conexiones gratuitas de Neon
-        if 'conexion' in locals() and conexion:
+        if 'conexion' in locals():
             cursor.close()
             conexion.close()
-            print("[*] Conexión cerrada de forma segura.")
 
 if __name__ == "__main__":
-    print("Iniciando Termómetro RED - Pipeline de Ingesta a BBDD\n" + "-"*55)
-    inyectar_telemetria()
+    inyectar_realidad_transapp("PA433")

@@ -2,43 +2,67 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# 1. Configuración de la página
-st.set_page_config(page_title="Termómetro RED", page_icon="🚌", layout="wide")
-st.title("🚌 Termómetro RED - Monitor de Telemetría")
-st.markdown("Dashboard en tiempo real consumiendo API REST Java Spring Boot 2.7")
+# 1. Configuración de la página (Filosofía Mobile-First)
+st.set_page_config(page_title="Termómetro RED", page_icon="🚌", layout="centered")
+
+# UI/UX: Encabezado ciudadano
+st.title("🚌 La Realidad del Paradero")
+st.markdown("Auditor Ciudadano del Transantiago. Datos en vivo, sin falacias.")
 st.divider()
 
-# 2. Conexión a tu API Java
-API_URL = "http://localhost:8080/api/telemetria"
+# 2. Buscador Interactivo
+st.subheader("¿Qué micro tomas?")
+# Limpieza del input: quita espacios y pasa a mayúsculas automáticamente
+recorrido_input = st.text_input("Ingresa tu recorrido", placeholder="Ej. 210, 506, I09").strip().upper()
 
-try:
-    with st.spinner('Consultando al servidor Java...'):
-        respuesta = requests.get(API_URL)
-        
-    if respuesta.status_code == 200:
-        datos = respuesta.json()
-        
-        if datos:
-            # 3. Transformar el JSON feo en una tabla profesional (DataFrame)
-            df = pd.DataFrame(datos)
+if recorrido_input:
+    # 3. Conexión dinámica a la API Java
+    API_URL = f"http://localhost:8080/api/telemetria?recorrido={recorrido_input}"
+    
+    try:
+        with st.spinner(f'Auditando la realidad del recorrido {recorrido_input}...'):
+            respuesta = requests.get(API_URL)
             
-            # Reordenar y renombrar columnas para que se vea nivel corporativo
-            df = df[['id', 'paradero', 'recorrido', 'patente', 'distanciaMetros', 'tiempoEstimadoMin']]
-            df.columns = ['ID', 'Paradero', 'Recorrido', 'Patente', 'Distancia (Metros)', 'Tiempo Estimado (Min)']
+        if respuesta.status_code == 200:
+            datos = respuesta.json()
             
-            # 4. Dibujar la tabla y métricas
-            st.success(f"¡Conexión exitosa! {len(datos)} registros obtenidos.")
-            
-            col1, col2 = st.columns(2)
-            col1.metric("Buses en Monitor", len(df))
-            col2.metric("Menor Tiempo de Llegada (Min)", df['Tiempo Estimado (Min)'].min())
-            
-            st.dataframe(df, width='stretch', hide_index=True)
-            
+            if datos:
+                df = pd.DataFrame(datos)
+                
+                # --- Motor Lógico Frontend ---
+                # Contamos buses únicos (patentes) para no duplicar si el backend envía históricos repetidos
+                total_buses = df['patente'].nunique()
+                
+                # Criterio: Si la distancia es > 50m, está en movimiento. Si es menor, está en terminal/paradero.
+                buses_en_movimiento = df[df['distanciaMetros'] > 50]['patente'].nunique()
+                buses_detenidos = total_buses - buses_en_movimiento
+                
+                # Frecuencia estimada (promedio de los 3 buses más cercanos)
+                df_ordenado = df.sort_values(by='tiempoEstimadoMin')
+                frecuencia_real = df_ordenado['tiempoEstimadoMin'].head(3).mean()
+                if pd.isna(frecuencia_real):
+                    frecuencia_real = 0
+
+                # 4. Renderizado de Tarjetas de Verdad
+                st.markdown("### El Veredicto:")
+                
+                st.info(f"**Salud del Recorrido Ahora:** Detectamos **{total_buses}** buses de la ruta {recorrido_input}. Hay **{buses_en_movimiento}** circulando y **{buses_detenidos}** detenidos/estacionados.")
+                
+                st.warning("**Comparativa Histórica:** [Módulo Forense en construcción] Requiere acumular más días de datos en PostgreSQL.")
+                
+                st.success(f"**Frecuencia Real Estimada:** Los próximos buses promedian una llegada cada **{int(frecuencia_real)}** minutos.")
+                
+                with st.expander("🕵️‍♂️ Ver telemetría cruda del sistema"):
+                    df_limpio = df[['patente', 'paradero', 'distanciaMetros', 'tiempoEstimadoMin']].drop_duplicates()
+                    df_limpio.columns = ['Patente', 'Paradero ID', 'Distancia (m)', 'Tiempo (min)']
+                    st.dataframe(df_limpio, width='stretch', hide_index=True)
+                    
+            else:
+                st.warning(f"La API no devolvió datos para el recorrido **{recorrido_input}**.")
         else:
-            st.info("La API respondió correctamente, pero no hay datos en la base de datos de Neon.")
-    else:
-        st.error(f"Error del servidor. Código HTTP: {respuesta.status_code}")
+            st.error(f"Error del servidor backend. Código HTTP: {respuesta.status_code}")
 
-except requests.exceptions.ConnectionError:
-    st.error("🚨 CRÍTICO: No se pudo conectar a la API. ¿Está el motor de Java Spring Boot encendido en el puerto 8080?")
+    except requests.exceptions.ConnectionError:
+        st.error("🚨 CRÍTICO: No se pudo conectar a la API. ¿Está el servidor Java encendido en la otra terminal?")
+else:
+    st.caption("Escribe el nombre de tu recorrido y presiona Enter para auditar.")
