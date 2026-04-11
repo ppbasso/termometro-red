@@ -16,8 +16,8 @@ def inyectar_telemetria():
     # 1. Obtener los datos reales de la API
     print(f"[*] Consultando API RED: {url_api}")
     try:
-        # timeout=10 evita que el script se quede colgado infinitamente si la API del gobierno cae
-        respuesta = requests.get(url_api, timeout=10)
+        # Aumentamos el timeout a 30 evita que el script se caiga por latencia de la API pública
+        respuesta = requests.get(url_api, timeout=30)
         respuesta.raise_for_status()
         datos = respuesta.json()
     except requests.exceptions.RequestException as e:
