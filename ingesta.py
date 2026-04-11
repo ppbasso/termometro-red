@@ -1,6 +1,7 @@
 import json
 import os
 import psycopg2
+import requests
 from dotenv import load_dotenv
 
 # Carga las variables secretas desde el archivo .env a la memoria
@@ -8,17 +9,20 @@ load_dotenv()
 
 def inyectar_telemetria():
     """
-    Lee el archivo JSON local simulado y guarda los registros en la base de datos PostgreSQL.
+    Consulta la API en vivo de RED y guarda los registros en la base de datos PostgreSQL.
     """
-    ruta_archivo = "dummy_pa433.json"
+    url_api = "https://api.xor.cl/red/bus-stop/PA433"
     
-    # 1. Leer los datos locales
-    if not os.path.exists(ruta_archivo):
-        print(f"[!] Error: El archivo {ruta_archivo} no existe.")
+    # 1. Obtener los datos reales de la API
+    print(f"[*] Consultando API RED: {url_api}")
+    try:
+        # timeout=10 evita que el script se quede colgado infinitamente si la API del gobierno cae
+        respuesta = requests.get(url_api, timeout=10)
+        respuesta.raise_for_status()
+        datos = respuesta.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[!] Error de red al consultar la API: {e}")
         return
-
-    with open(ruta_archivo, 'r', encoding='utf-8') as archivo:
-        datos = json.load(archivo)
     
     # Extraemos el ID del paradero
     id_paradero = datos.get("id", "Desconocido")
@@ -47,16 +51,18 @@ def inyectar_telemetria():
                 distancia = bus.get("meters_distance")
                 minutos = bus.get("min_arrival_time")
                 
-                # Sentencia SQL parametrizada (%s) (La mejor práctica para evitar inyecciones SQL)
-                sql = """
-                    INSERT INTO telemetria_buses (paradero, recorrido, patente, distancia_metros, tiempo_estimado_min)
-                    VALUES (%s, %s, %s, %s, %s)
-                """
-                valores = (id_paradero, recorrido, patente, distancia, minutos)
-                
-                # Ejecutamos la orden
-                cursor.execute(sql, valores)
-                registros_insertados += 1
+                # Filtro de validación: Ignorar registros "fantasmas" que no traen telemetría útil
+                if patente and distancia is not None and minutos is not None:
+                    # Sentencia SQL parametrizada (%s) (La mejor práctica para evitar inyecciones SQL)
+                    sql = """
+                        INSERT INTO telemetria_buses (paradero, recorrido, patente, distancia_metros, tiempo_estimado_min)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """
+                    valores = (id_paradero, recorrido, patente, distancia, minutos)
+                    
+                    # Ejecutamos la orden
+                    cursor.execute(sql, valores)
+                    registros_insertados += 1
         
         # Confirmar y guardar los cambios (Commit)
         conexion.commit()
