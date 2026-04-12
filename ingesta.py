@@ -52,7 +52,6 @@ def inyectar_predictor_oficial(paradero_id, token):
                     numeros_tiempo = [int(s) for s in str(minutos_1_str).split() if s.isdigit()]
                     minutos_1 = numeros_tiempo[0] if numeros_tiempo else 0
 
-                    # ESTE ES EL PAYLOAD: El paquete de datos que viaja a tu API Java
                     payload = {
                         "paradero": paradero_id,
                         "recorrido": recorrido,
@@ -96,7 +95,11 @@ def inyectar_predictor_oficial(paradero_id, token):
                 except Exception as err:
                     print(f"[!] Error enviando Bus 2: {err}")
 
-    print(f"[+] ¡ÉXITO TOTAL! {registros} buses procesados a través de tu Controlador Java.")
+    # Lógica de mensajes corregida
+    if registros > 0:
+        print(f"[+] ¡ÉXITO TOTAL! {registros} buses procesados a través de tu Controlador Java.")
+    else:
+        print(f"[!] MISIÓN FALLIDA: 0 buses insertados. Revisa el @PostMapping de tu API Java.")
 
 if __name__ == "__main__":
     TOKEN_MAESTRO = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3NzU5NzI4ODN9.krrvifhYN55uEB0KuFCCWYuz-Tpvoj8nyLDaMzQVtrE"
