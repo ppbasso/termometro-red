@@ -16,8 +16,8 @@ st.subheader("¿Qué micro tomas?")
 recorrido_input = st.text_input("Ingresa tu recorrido", placeholder="Ej. 210, 506, I09").strip().upper()
 
 if recorrido_input:
-    # 3. Conexión dinámica a la API Java
-    API_URL = f"http://localhost:8080/api/telemetria?recorrido={recorrido_input}"
+    # 3. Conexión dinámica a la API Java en la nube (Hugging Face)
+    API_URL = f"https://ppbasso-termometro-red-api.hf.space/api/telemetria?recorrido={recorrido_input}"
     
     try:
         with st.spinner(f'Auditando la realidad del recorrido {recorrido_input}...'):
@@ -63,6 +63,6 @@ if recorrido_input:
             st.error(f"Error del servidor backend. Código HTTP: {respuesta.status_code}")
 
     except requests.exceptions.ConnectionError:
-        st.error("🚨 CRÍTICO: No se pudo conectar a la API. ¿Está el servidor Java encendido en la otra terminal?")
+        st.error("🚨 CRÍTICO: No se pudo conectar a la API. Verifica si Hugging Face está en modo 'Sleeping' o reiniciando.")
 else:
     st.caption("Escribe el nombre de tu recorrido y presiona Enter para auditar.")
