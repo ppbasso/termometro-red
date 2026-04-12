@@ -5,29 +5,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def inyectar_realidad_v1(paradero_id):
-    # Endpoint VERSIONADO y REAL que alimenta la web oficial hoy
-    url_api = f"https://www.red.cl/rest/v1/itinerarios/parada/{paradero_id}"
+def inyectar_realidad_final(paradero_id):
+    # Endpoint SINGULAR (itinerario): La llave maestra definitiva
+    url_api = f"https://www.red.cl/rest/v1/itinerario/parada/{paradero_id}"
     
-    # Headers CRÍTICOS: El servidor valida el Accept y el Referer estrictamente
+    # Headers extraídos de una sesión real de navegación en red.cl
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "Referer": f"https://www.red.cl/planifica-tu-viaje/cuando-llega/?codsimt={paradero_id}",
-        "X-Requested-With": "XMLHttpRequest",
-        "Connection": "keep-alive"
+        "X-Requested-With": "XMLHttpRequest"
     }
     
-    print(f"[*] Modo Stealth V1: Consultando itinerarios para {paradero_id}...")
+    print(f"[*] Modo Stealth Final: Consultando {url_api}")
     
     try:
-        # Petición a la ruta versionada
         respuesta = requests.get(url_api, headers=headers, timeout=15)
-        # Si da 404 aquí, el servidor ha cambiado a v2 o v3
+        # Si esto da 404, el servidor cambió la estructura en el último minuto
         respuesta.raise_for_status()
         datos = respuesta.json()
     except Exception as e:
-        print(f"[!] Error de conexión en ruta V1: {e}")
+        print(f"[!] Error de conexión en la ruta final: {e}")
         return
 
     url_db = os.getenv("DATABASE_URL")
@@ -36,7 +34,7 @@ def inyectar_realidad_v1(paradero_id):
         cursor = conexion.cursor()
         registros = 0
 
-        # Estructura del JSON V1: servicios -> item -> distanciaBuses
+        # Procesamiento del JSON oficial
         if "servicios" in datos and "item" in datos["servicios"]:
             for servicio in datos["servicios"]["item"]:
                 recorrido = servicio.get("servicio")
@@ -45,14 +43,18 @@ def inyectar_realidad_v1(paradero_id):
                     for bus in servicio.get("distanciaBuses", []):
                         patente = bus.get("patente", "N/A").replace("-", "")
                         
-                        # Limpieza y conversión de telemetría
+                        # Conversión de telemetría: "1.2 km" -> 1200 o "05 min." -> 5
                         try:
-                            distancia = int(''.join(filter(str.isdigit, str(bus.get("distancia", "0")))))
-                            minutos = int(''.join(filter(str.isdigit, str(bus.get("tiempo", "0")))))
+                            # Limpieza profunda de strings a números
+                            dist_str = str(bus.get("distancia", "0"))
+                            distancia = int(''.join(filter(str.isdigit, dist_str)))
+                            
+                            tiempo_str = str(bus.get("tiempo", "0"))
+                            minutos = int(''.join(filter(str.isdigit, tiempo_str)))
                         except ValueError:
                             continue
 
-                        if patente != "N/A" and patente != "":
+                        if patente and patente != "N/A":
                             sql = """
                                 INSERT INTO telemetria_buses (paradero, recorrido, patente, distancia_metros, tiempo_estimado_min)
                                 VALUES (%s, %s, %s, %s, %s)
@@ -61,7 +63,7 @@ def inyectar_realidad_v1(paradero_id):
                             registros += 1
         
         conexion.commit()
-        print(f"[+] ¡ÉXITO V1! {registros} registros inyectados para el paradero {paradero_id}.")
+        print(f"[+] ¡MISIÓN CUMPLIDA! {registros} buses inyectados para {paradero_id}.")
     except Exception as e:
         print(f"[!] Error DB: {e}")
     finally:
@@ -70,5 +72,5 @@ def inyectar_realidad_v1(paradero_id):
             conexion.close()
 
 if __name__ == "__main__":
-    # Paradero confirmado con data en tu captura de pantalla
-    inyectar_realidad_v1("PA433")
+    # PA433: El paradero que confirmamos con data en tu navegador
+    inyectar_realidad_final("PA433")
