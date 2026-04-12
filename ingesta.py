@@ -5,23 +5,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def inyectar_realidad_publica(paradero_id):
-    # Endpoint FINAL y OFICIAL (Singular: paradero)
-    url_api = f"https://www.red.cl/rest/paradero/{paradero_id}"
+def inyectar_realidad_correcta(paradero_id):
+    # Endpoint exacto que alimenta la vista de tu captura de pantalla
+    url_api = f"https://www.red.cl/rest/cuando-llega/parada/{paradero_id}"
     
-    # Camuflaje: Mantenemos el spoofing que ya logró saltar el bloqueo de IP
+    # Camuflaje: Headers de navegador para evitar el bloqueo por IP
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "es-CL,es;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://www.red.cl/",
+        "Referer": f"https://www.red.cl/planifica-tu-viaje/cuando-llega/?codsimt={paradero_id}",
         "Connection": "keep-alive"
     }
     
-    print(f"[*] Modo Stealth: Consultando paradero {paradero_id}...")
+    print(f"[*] Modo Stealth: Consultando paradero {paradero_id} en la ruta real...")
     
     try:
-        # Petición al endpoint definitivo
+        # Petición a la API del gobierno
         respuesta = requests.get(url_api, headers=headers, timeout=15)
         respuesta.raise_for_status()
         datos = respuesta.json()
@@ -30,37 +29,26 @@ def inyectar_realidad_publica(paradero_id):
         return
 
     url_db = os.getenv("DATABASE_URL")
-    if not url_db:
-        print("[!] ERROR: Variable DATABASE_URL no encontrada.")
-        return
-
     try:
         conexion = psycopg2.connect(url_db)
         cursor = conexion.cursor()
         registros = 0
 
-        # Mapeo del JSON de Red.cl
+        # Navegación del JSON: servicios -> item -> distanciaBuses
         if "servicios" in datos and "item" in datos["servicios"]:
             for servicio in datos["servicios"]["item"]:
                 recorrido = servicio.get("servicio")
                 
+                # 'distanciaBuses' es la clave donde vienen las patentes en este endpoint
                 if "distanciaBuses" in servicio:
                     for bus in servicio.get("distanciaBuses", []):
-                        # Limpieza de patente
                         patente = bus.get("patente", "DESCONOCIDO").replace("-", "")
                         
-                        # Conversión de telemetría (distancia y tiempo)
-                        try:
-                            distancia = int(''.join(filter(str.isdigit, str(bus.get("distancia", "0")))))
-                        except ValueError:
-                            distancia = 0
-                            
-                        try:
-                            minutos = int(''.join(filter(str.isdigit, str(bus.get("tiempo", "0")))))
-                        except ValueError:
-                            minutos = 0
+                        # Limpieza y conversión de telemetría (m y min)
+                        distancia = int(''.join(filter(str.isdigit, str(bus.get("distancia", "0")))))
+                        minutos = int(''.join(filter(str.isdigit, str(bus.get("tiempo", "0")))))
 
-                        if patente != "DESCONOCIDO":
+                        if patente != "DESCONOCIDO" and distancia > 0:
                             sql = """
                                 INSERT INTO telemetria_buses (paradero, recorrido, patente, distancia_metros, tiempo_estimado_min)
                                 VALUES (%s, %s, %s, %s, %s)
@@ -69,7 +57,7 @@ def inyectar_realidad_publica(paradero_id):
                             registros += 1
         
         conexion.commit()
-        print(f"[+] ¡ÉXITO! {registros} buses inyectados a Neon desde el paradero {paradero_id}.")
+        print(f"[+] ¡ÉXITO! {registros} buses del paradero {paradero_id} inyectados correctamente.")
     except Exception as e:
         print(f"[!] Error DB: {e}")
     finally:
@@ -78,5 +66,5 @@ def inyectar_realidad_publica(paradero_id):
             conexion.close()
 
 if __name__ == "__main__":
-    # PA433 es el paradero de prueba (M) Santa Lucía
-    inyectar_realidad_publica("PA433")
+    # Paradero PA433 (Escuela de Ingeniería) confirmado con data en tu captura
+    inyectar_realidad_correcta("PA433")
