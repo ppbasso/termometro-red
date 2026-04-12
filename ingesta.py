@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def inyectar_realidad_publica(paradero_id):
-    # Endpoint de la web pública de Red (Puerta trasera ciudadana)
-    url_api = f"https://www.red.cl/rest/paraderos/{paradero_id}"
+    # Endpoint CORRECTO de la web pública de Red (Singular: parada)
+    url_api = f"https://www.red.cl/rest/parada/{paradero_id}"
     
-    # Camuflaje: Spoofing de User-Agent simulando Chrome en Windows 11
+    # Camuflaje: Spoofing de User-Agent (Mantenemos lo que ya funcionó)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -18,20 +18,20 @@ def inyectar_realidad_publica(paradero_id):
         "Connection": "keep-alive"
     }
     
-    print(f"[*] Modo Stealth: Consultando web pública para paradero {paradero_id}")
+    print(f"[*] Modo Stealth: Consultando parada {paradero_id}...")
     
     try:
-        # Ejecutamos la petición con el camuflaje puesto
+        # Petición con el endpoint corregido
         respuesta = requests.get(url_api, headers=headers, timeout=15)
         respuesta.raise_for_status()
         datos = respuesta.json()
     except Exception as e:
-        print(f"[!] Error de conexión con servidor público: {e}")
+        print(f"[!] Error de conexión: {e}")
         return
 
     url_db = os.getenv("DATABASE_URL")
     if not url_db:
-        print("[!] ERROR: Variable DATABASE_URL no encontrada en el entorno.")
+        print("[!] ERROR: Variable DATABASE_URL no encontrada.")
         return
 
     try:
@@ -39,30 +39,31 @@ def inyectar_realidad_publica(paradero_id):
         cursor = conexion.cursor()
         registros = 0
 
-        # Parseo del árbol JSON del gobierno
+        # El JSON de red.cl agrupa por 'servicios' -> 'item'
         if "servicios" in datos and "item" in datos["servicios"]:
             for servicio in datos["servicios"]["item"]:
                 recorrido = servicio.get("servicio")
                 
-                # Validamos si el servicio tiene buses en ruta informados
+                # 'distanciaBuses' contiene la telemetría real de cada bus en camino
                 if "distanciaBuses" in servicio:
                     for bus in servicio.get("distanciaBuses", []):
-                        # Limpieza de caracteres basura ("ABCD-12" -> "ABCD12")
+                        # Limpieza: Quitamos guiones de la patente
                         patente = bus.get("patente", "DESCONOCIDO").replace("-", "")
                         
-                        # Conversión de texto a número entero ("400 metros" -> 400)
+                        # Conversión: Extraemos solo los números de "450 metros" o "02 min."
                         try:
-                            distancia = int(''.join(filter(str.isdigit, str(bus.get("distancia", "0")))))
+                            distancia_str = str(bus.get("distancia", "0"))
+                            distancia = int(''.join(filter(str.isdigit, distancia_str)))
                         except ValueError:
                             distancia = 0
                             
-                        # Conversión de tiempo a entero ("02 min." -> 2)
                         try:
-                            minutos = int(''.join(filter(str.isdigit, str(bus.get("tiempo", "0")))))
+                            tiempo_str = str(bus.get("tiempo", "0"))
+                            minutos = int(''.join(filter(str.isdigit, tiempo_str)))
                         except ValueError:
                             minutos = 0
 
-                        if patente != "DESCONOCIDO" and distancia > 0:
+                        if patente != "DESCONOCIDO":
                             sql = """
                                 INSERT INTO telemetria_buses (paradero, recorrido, patente, distancia_metros, tiempo_estimado_min)
                                 VALUES (%s, %s, %s, %s, %s)
@@ -71,7 +72,7 @@ def inyectar_realidad_publica(paradero_id):
                             registros += 1
         
         conexion.commit()
-        print(f"[+] ¡ÉXITO! {registros} registros inyectados desde infraestructura web gubernamental.")
+        print(f"[+] ¡ÉXITO! {registros} buses inyectados a Neon desde la parada {paradero_id}.")
     except Exception as e:
         print(f"[!] Error DB: {e}")
     finally:
@@ -80,4 +81,5 @@ def inyectar_realidad_publica(paradero_id):
             conexion.close()
 
 if __name__ == "__main__":
+    # Probamos con el paradero que estabas usando
     inyectar_realidad_publica("PA433")
