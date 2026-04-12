@@ -30,4 +30,12 @@ public class TelemetriaBus {
     public String getPatente() { return patente; }
     public Integer getDistanciaMetros() { return distanciaMetros; }
     public Integer getTiempoEstimadoMin() { return tiempoEstimadoMin; }
+
+    // SETTERS (CRÍTICOS para recibir el POST de Python)
+    public void setId(Long id) { this.id = id; }
+    public void setParadero(String paradero) { this.paradero = paradero; }
+    public void setRecorrido(String recorrido) { this.recorrido = recorrido; }
+    public void setPatente(String patente) { this.patente = patente; }
+    public void setDistanciaMetros(Integer distanciaMetros) { this.distanciaMetros = distanciaMetros; }
+    public void setTiempoEstimadoMin(Integer tiempoEstimadoMin) { this.tiempoEstimadoMin = tiempoEstimadoMin; }
 }
