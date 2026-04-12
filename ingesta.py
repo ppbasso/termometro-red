@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def inyectar_realidad_publica(paradero_id):
-    # Endpoint CORRECTO de la web pública de Red (Singular: parada)
-    url_api = f"https://www.red.cl/rest/parada/{paradero_id}"
+    # Endpoint FINAL y OFICIAL (Singular: paradero)
+    url_api = f"https://www.red.cl/rest/paradero/{paradero_id}"
     
-    # Camuflaje: Spoofing de User-Agent (Mantenemos lo que ya funcionó)
+    # Camuflaje: Mantenemos el spoofing que ya logró saltar el bloqueo de IP
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -18,10 +18,10 @@ def inyectar_realidad_publica(paradero_id):
         "Connection": "keep-alive"
     }
     
-    print(f"[*] Modo Stealth: Consultando parada {paradero_id}...")
+    print(f"[*] Modo Stealth: Consultando paradero {paradero_id}...")
     
     try:
-        # Petición con el endpoint corregido
+        # Petición al endpoint definitivo
         respuesta = requests.get(url_api, headers=headers, timeout=15)
         respuesta.raise_for_status()
         datos = respuesta.json()
@@ -39,27 +39,24 @@ def inyectar_realidad_publica(paradero_id):
         cursor = conexion.cursor()
         registros = 0
 
-        # El JSON de red.cl agrupa por 'servicios' -> 'item'
+        # Mapeo del JSON de Red.cl
         if "servicios" in datos and "item" in datos["servicios"]:
             for servicio in datos["servicios"]["item"]:
                 recorrido = servicio.get("servicio")
                 
-                # 'distanciaBuses' contiene la telemetría real de cada bus en camino
                 if "distanciaBuses" in servicio:
                     for bus in servicio.get("distanciaBuses", []):
-                        # Limpieza: Quitamos guiones de la patente
+                        # Limpieza de patente
                         patente = bus.get("patente", "DESCONOCIDO").replace("-", "")
                         
-                        # Conversión: Extraemos solo los números de "450 metros" o "02 min."
+                        # Conversión de telemetría (distancia y tiempo)
                         try:
-                            distancia_str = str(bus.get("distancia", "0"))
-                            distancia = int(''.join(filter(str.isdigit, distancia_str)))
+                            distancia = int(''.join(filter(str.isdigit, str(bus.get("distancia", "0")))))
                         except ValueError:
                             distancia = 0
                             
                         try:
-                            tiempo_str = str(bus.get("tiempo", "0"))
-                            minutos = int(''.join(filter(str.isdigit, tiempo_str)))
+                            minutos = int(''.join(filter(str.isdigit, str(bus.get("tiempo", "0")))))
                         except ValueError:
                             minutos = 0
 
@@ -72,7 +69,7 @@ def inyectar_realidad_publica(paradero_id):
                             registros += 1
         
         conexion.commit()
-        print(f"[+] ¡ÉXITO! {registros} buses inyectados a Neon desde la parada {paradero_id}.")
+        print(f"[+] ¡ÉXITO! {registros} buses inyectados a Neon desde el paradero {paradero_id}.")
     except Exception as e:
         print(f"[!] Error DB: {e}")
     finally:
@@ -81,5 +78,5 @@ def inyectar_realidad_publica(paradero_id):
             conexion.close()
 
 if __name__ == "__main__":
-    # Probamos con el paradero que estabas usando
+    # PA433 es el paradero de prueba (M) Santa Lucía
     inyectar_realidad_publica("PA433")
