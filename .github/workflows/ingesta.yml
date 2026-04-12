@@ -2,8 +2,8 @@ name: Francotirador de Ingesta (Stealth)
 
 on:
   schedule:
-    # Se ejecuta cada 5 minutos (Cron syntax)
-    - cron: '*/5 * * * *'
+    # Se ejecuta cada 10 minutos para proteger la cuota de GitHub y evitar baneos
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Permite ejecutarlo manualmente para probar
 
 jobs:
@@ -24,7 +24,4 @@ jobs:
           pip install -r requirements.txt
 
       - name: Ejecutar Script de Ingesta (Stealth)
-        env:
-          # Inyectamos el secreto de GitHub a la variable de entorno que lee Python
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python ingesta.py
